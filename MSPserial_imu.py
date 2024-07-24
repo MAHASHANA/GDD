@@ -1,58 +1,46 @@
-import serial
-import struct
+from pymultiwii import MultiWii
 import time
 
-def read_msp_response(serial_conn):
-    header = serial_conn.read(3)
-    if header != b'$M>':
-        raise Exception('Invalid header received')
+# Initialize the MultiWii object with the serial port
+serialPort = "/dev/ttyACM0"  # Adjust the serial port as needed
+board = MultiWii(serialPort)
 
-    size = struct.unpack('B', serial_conn.read(1))[0]
-    code = struct.unpack('B', serial_conn.read(1))[0]
-    data = serial_conn.read(size)
-    checksum = struct.unpack('B', serial_conn.read(1))[0]
+# Function to arm the drone
+def arm_drone(board):
+    board.sendCMD(8, MultiWii.SET_RAW_RC, [1500, 1500, 1000, 989, 2100, 1500, 1500, 1500], '8H')
+    print("Arming command sent")
+    time.sleep(1)  # Allow some time for the drone to arm
 
-    return code, data
+# Function to run motors
+def run_motors(board, duration):
+    start_time = time.time()
+    while time.time() - start_time < duration:
+        board.sendCMD(8, MultiWii.SET_RAW_RC, [1500, 1500, 1000, 2000, 2100, 1500, 1500, 1500], '8H')
+        print("Running motors command sent")
+        time.sleep(0.5)
 
-def get_imu_data(serial_conn):
-    # Send MSP_RAW_IMU command
-    command = b'$M<\x00\x66\x66'
-    serial_conn.write(command)
+# Function to disarm the drone
+def disarm_drone(board):
+    board.sendCMD(8, MultiWii.SET_RAW_RC, [1500, 1500, 1000, 989, 1300, 1500, 1500, 1500], '8H')
+    print("Disarming command sent")
 
-    # Read the response
-    code, data = read_msp_response(serial_conn)
-    if code != 0x66:
-        raise Exception('Invalid response code received')
+# Main logic to arm, run motors, and disarm
+if __name__ == "__main__":
+    # Arm the drone
+    arm_drone(board)
 
-    # Print the raw data for debugging
-    print(f'Raw data: {data.hex()}')
+    # Check if the drone is armed
+    data = board.getData(MultiWii.ATTITUDE)
+    print(f"Status after arming: {data}")
 
-    # Ensure the data received is the correct length (18 bytes for extended data)
-    if len(data) < 12:
-        raise Exception(f'Unexpected data length: {len(data)}')
+    # Run motors for 10 seconds
+    run_motors(board, 30)
 
-    # Unpack IMU data (accX, accY, accZ, gyrX, gyrY, gyrZ)
-    imu_data = struct.unpack('<hhhhhh', data[:12])
-    return data, imu_data
+    # Disarm the drone
+    disarm_drone(board)
 
-def main():
-    # Adjust the serial port name to match your setup
-    serial_port = '/dev/ttyACM0'  # or 'COMx' on Windows
-    baud_rate = 115200
-
-    try:
-        with serial.Serial(serial_port, baud_rate, timeout=1) as ser:
-            start_time = time.time()
-            count = 0
-
-            while count < 20 and (time.time() - start_time) < 10:
-                raw_data, imu_data = get_imu_data(ser)
-                print(f'IMU Data Point {count + 1}: Raw data: {raw_data.hex()} Modified data: {imu_data}')
-                count += 1
-                time.sleep(0.5)  # Small delay to avoid overwhelming the serial connection
-
-    except Exception as e:
-        print(f'Error: {e}')
-
-if __name__ == '__main__':
-    main()
+    # Continuously read and print incoming data
+    while True:
+        data = board.getData(MultiWii.ATTITUDE)
+        print(data)
+        time.sleep(0.1)  # Adjust the sleep time as needed to control the rate of data reading

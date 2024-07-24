@@ -5,7 +5,7 @@ import struct
 from yamspy import MSPy
 
 # Define the serial port
-serial_port = "/dev/ttyACM0"
+serial_port = "/dev/ttyACM3"
 
 class CustomMSPy(MSPy):
     def fast_read_imu(self):
@@ -86,12 +86,13 @@ with CustomMSPy(device=serial_port, logfilename='MSPy.log', logfilemode='a', log
     if board == 1:
         print("An error occurred... probably the serial port is not available ;)")
         sys.exit(1)
+    while True:
+        # Read IMU data
+        read_imu_data(board)
+        time.sleep(1)
+        #Read optical flow data
+        read_optical_flow_data(board)
+        time.sleep(1)
 
-    # Read IMU data
-    read_imu_data(board)
-    time.sleep(1)
-
-    # Read optical flow data
-    read_optical_flow_data(board)
-    time.sleep(1)
+    
 

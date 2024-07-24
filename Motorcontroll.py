@@ -1,10 +1,10 @@
 import sys
 import time
-import serial
+import serial as ser
 from yamspy import MSPy
 
 # Define the serial port
-serial_port = "/dev/ttyACM0"
+serial_port = "/dev/ttyACM3"
 
 # Avoid dangerous commands
 avoid_list = ['MSP_DATAFLASH_ERASE', 'MSP_DATAFLASH_READ', 'MSP_EEPROM_WRITE']
@@ -41,18 +41,28 @@ with MSPy(device=serial_port, logfilename='MSPy.log', logfilemode='a', loglevel=
         else:
             print("Failed to set motor speeds")
 
-    # Arm the drone
-    arm_drone()
-    time.sleep(2)  # Wait for the command to be processed
+    try:
+        # Arm the drone
+        arm_drone()
+        time.sleep(2)  # Wait for the command to be processed
 
-    # Set motor speeds (values between 1000 and 2000)
-    motor_speeds = [1500, 1500, 1500, 1500]  # Example motor speeds
-    set_motor_speeds(motor_speeds)
-    time.sleep(3)  # Keep motors running for 5 seconds
+        # Set motor speeds (values between 1000 and 2000)
+        motor_speeds = [1500, 1500, 1500, 1500]  # Example motor speeds
+        set_motor_speeds(motor_speeds)
+        
+        # Keep motors running until interrupted
+        while True:
+            time.sleep(1)
 
-    # Disarm the drone
-    disarm_drone()
-    time.sleep(2)  # Wait for the command to be processed
+    except KeyboardInterrupt:
+        # Disarm the drone on keyboard interrupt
+        print("Keyboard interrupt received. Disarming the drone...")
+        disarm_drone()
+        time.sleep(2)  # Wait for the command to be processed
+    finally:
+        # Ensure the serial connection is closed on exit
+        ser.close()
+        print("Serial connection closed.")
 
     # Print arming disable flags
     print("armingDisableFlags: {}".format(board.process_armingDisableFlags(board.CONFIG['armingDisableFlags'])))
@@ -62,5 +72,5 @@ with MSPy(device=serial_port, logfilename='MSPy.log', logfilemode='a', loglevel=
         try:
             dataHandler = board.receive_msg()
             board.process_recv_data(dataHandler)
-        except serial.SerialException:
+        except ser.SerialException:
             print("Board is rebooting")
